@@ -1,0 +1,238 @@
+---
+title: "Tennis Analysis"
+author: "Navaneethan Santhanam"
+date: "September 11, 2015"
+output: html_document
+---
+
+I'm analysing the 2014 Australian Open Men's Singles event. The data was a recent addition to the UCI Machine Learning Repository, and I thought it might be an interesting exercise to see what the data can tell us about the event. I'm going to show some preliminary analysis across various rounds of the tournament, but focus on the final between Rafael Nadal and Stanislas Wavrinka.
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width = 12, fig.height = 8,
+                      fig.path='Figs/', 
+                      echo=FALSE, warning=FALSE, message=FALSE, 
+                      comments = "")
+```
+
+```{r, echo=FALSE}
+library(plyr)
+library(ggplot2)
+library(reshape2)
+library(randomForest)
+```
+
+```{r, echo=FALSE}
+# setwd(c(getwd(), '/', 'Tennis-Major-Tournaments-Match-Statistics/'))
+fname <- '~/Dropbox (Personal)/Artoo/Tennis-Major-Tournaments-Match-Statistics/AusOpen-men-2013.csv'
+tennis.data <- read.csv(fname, header = T, stringsAsFactors = F)
+
+
+tennis.data$Result.Name <- ifelse(test = tennis.data$Result == 1, 
+                                  yes = tennis.data$Player1, 
+                                  no = tennis.data$Player2)
+
+tennis.data$Last.Set.in.Match <- ifelse(test = is.na(tennis.data$ST5.1),
+                                        yes = ifelse(is.na(tennis.data$ST4.1), 3, 4),
+                                        no = 5)
+```
+
+```{r, echo=FALSE}
+tennis.data2 <- matrix(nrow = nrow(tennis.data), ncol = ncol(tennis.data))
+tennis.data2[, c(3:ncol(tennis.data)-2)] <- sapply(c(3:ncol(tennis.data)-2), function(col) {
+  a <- ifelse(is.na(tennis.data[, col]), 0, tennis.data[, col])
+  as.numeric(as.character(a))
+})
+tennis.data2 <- as.data.frame(tennis.data2)
+tennis.data2[, c(1, 2, ncol(tennis.data)-1, ncol(tennis.data))] <- tennis.data[, c(1, 2, ncol(tennis.data)-1, ncol(tennis.data))]
+colnames(tennis.data2) <- colnames(tennis.data)
+
+rounds <- c('R-128', 'R-64', 'R-32', 'R-16', 'QF', 'SF', 'Final')
+```
+
+```{r, echo=FALSE}
+# tennis.data2$FSP.diff <- tennis.data2$FSP.1 - tennis.data2$FSP.2
+# tennis.data2$SSP.diff <- tennis.data2$SSP.1 - tennis.data2$SSP.2
+# tennis.data2$ACE.diff <- tennis.data2$ACE.1 - tennis.data2$ACE.2
+# tennis.data2$DBF.diff <- tennis.data2$DBF.1 - tennis.data2$DBF.2
+```
+
+First, let's look at some basic details - how long did matches take across various rounds? There appears to be no clear trend across rounds, with Round 5 (Quarter-Finals) lasting longest on average (4.25 sets). All 4 games in this round lasted 4 sets or more, with one (Wavrinka vs Djokavic) going to 5 sets.
+```{r, echo=FALSE}
+set.count <- ddply(tennis.data2, 
+                   .variables = c('Round'), 
+                   .fun = 'summarise',
+                    Mean.Sets = mean(Last.Set.in.Match))
+colnames(set.count)[2] <- 'Mean.Sets.per.Round'
+
+last.set.plt <- ggplot(set.count, aes(x = Round, y = Mean.Sets.per.Round)) +
+    geom_bar(stat = 'identity', fill = 'red2') +
+    ggtitle('Match Duration') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('Number of Sets') + 
+    scale_x_continuous(breaks = c(1:7))
+    # geom_text(aes(x = provider, y = max(share)+10, label = share), hjust = 0.4, size = 6)
+#     geom_text(aes(x = provider, y = max(share)+5, label = paste(share, '%', sep = '')), 
+#               hjust = 0.4, size = 6)
+print(last.set.plt)
+```
+
+Next, let's look at some measures of individual performance, across rounds. Some measures of performance include - the margin between winning and losing in terms of the number of points won, the accuracy of serves, etc.
+
+First, let's look at point differences. We should expect to see earlier rounds with a greater differential since higher-ranked players will be playing lower-ranked players, and a gulf in expertise should be visible. This might be true to some extent, given that the Quarter-Finals and Semi-Finals appear to have seen some close matches. The Final, interestingly, has the largest point difference between winner and loser, and to some extent this is explained by Rafael Nadal's back injury which he sustained earlier in the tournament.
+```{r, echo=FALSE}
+tennis.data2$TPW.Diff <- ifelse(tennis.data2$Result == 0, 
+                                tennis.data2$TPW.2 - tennis.data2$TPW.1,
+                                tennis.data2$TPW.1 - tennis.data2$TPW.2)
+tpw.diff.count <- ddply(tennis.data2, 
+                   .variables = c('Round'), 
+                   .fun = 'summarise',
+                    Mean.Sets = mean(TPW.Diff))
+colnames(tpw.diff.count)[2] <- 'Mean.Point.Diff.per.Round'
+tpw.diff.plt <- ggplot(tpw.diff.count, aes(x = Round, y = Mean.Point.Diff.per.Round)) +
+    geom_bar(stat = 'identity', fill = 'dodgerblue2') +
+    ggtitle('Point Differential by Round') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('Average Point Differential') + 
+    scale_x_continuous(breaks = c(1:7)) 
+    # geom_text(aes(x = provider, y = max(share)+10, label = share), hjust = 0.4, size = 6)
+#     geom_text(aes(x = provider, y = max(share)+5, label = paste(share, '%', sep = '')), 
+#               hjust = 0.4, size = 6)
+print(tpw.diff.plt)
+```
+
+Next, let's look at First Serve Accuracy. How much more often did match winners in each round WIN their first serves relative to their opponents? There seems be an increase in this until the Quarter Final, followed by a sharp drop thereafter. In the Semi-Final and Final, match winners appears to rely less on their first serve, with a negative differential.
+```{r, echo=FALSE}
+tennis.data2$FSP.Diff <- ifelse(tennis.data2$Result == 0, 
+                                (tennis.data2$FSW.2 - tennis.data2$FSW.1)*100/tennis.data2$FSW.1,
+                                (tennis.data2$FSW.1 - tennis.data2$FSW.2)*100/tennis.data2$FSW.2)
+
+fsp.diff.count <- ddply(tennis.data2, 
+                   .variables = c('Round'), 
+                   .fun = 'summarise',
+                    Mean.Sets = mean(FSP.Diff))
+colnames(fsp.diff.count)[2] <- 'Mean.First.Serve.Perc.Diff.per.Round'
+fsp.diff.plt <- ggplot(fsp.diff.count, aes(x = Round, y = Mean.First.Serve.Perc.Diff.per.Round)) +
+    geom_bar(stat = 'identity') +
+    ggtitle('First Serve Perc Differential by Round') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('Average First Serve Perc Differential') + 
+    scale_x_continuous(breaks = c(1:7)) 
+    # geom_text(aes(x = provider, y = max(share)+10, label = share), hjust = 0.4, size = 6)
+#     geom_text(aes(x = provider, y = max(share)+5, label = paste(share, '%', sep = '')), 
+#               hjust = 0.4, size = 6)
+print(fsp.diff.plt)
+```
+
+Examining 2nd serve wins, we see our first really interesting data point. There doesn't appear to be much difference between winners and losers across rounds when it comes to the 2nd serve (a point to note though - looking at the scale of the axes, 2nd serve winners differentiate more than first serve winners: more on this in a second). The most striking aspect comes from the final. Stan Wawrinka scored 22 wins on his 2nd serve, while Nadal merely scored 10! That's a 120% increase. Nadal wins 5 times as many points on first serve than second, whereas with Stan it's just a 2:1 ratio.
+```{r, echo=FALSE}
+tennis.data2$SSP.Diff <- ifelse(tennis.data2$Result == 0, 
+                                (tennis.data2$SSW.2 - tennis.data2$SSW.1)*100/tennis.data2$SSW.1,
+                                (tennis.data2$SSW.1 - tennis.data2$SSW.2)*100/tennis.data2$SSW.2)
+
+ssp.diff.count <- ddply(tennis.data2, 
+                   .variables = c('Round'), 
+                   .fun = 'summarise',
+                    Mean.Sets = mean(SSP.Diff))
+colnames(ssp.diff.count)[2] <- 'Mean.Second.Serve.Perc.Diff.per.Round'
+
+ssp.diff.plt <- ggplot(ssp.diff.count, aes(x = Round, y = Mean.Second.Serve.Perc.Diff.per.Round)) +
+    geom_bar(stat = 'identity') +
+    ggtitle('Second Serve Perc Differential by Round') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('Average Second Serve Perc Differential') + 
+    scale_x_continuous(breaks = c(1:7))
+print(ssp.diff.plt)
+```
+
+Let's compare their serves head to head - the 2 takeways here are:
+
+1. Stan has a better Second Serve Win rate (SSW in blue), which reinforces the previous point
+
+2. His serve was a much more effective weapon on the day: He scored 19 aces to Rafa's 1 (ACE in red)
+```{r, echo=FALSE}
+final.fname <- '2014_Aus_Open_Final.csv'
+final.data <- read.csv(final.fname, header = T)
+
+final.serves <- final.data[, c(1:3, 7:8)]
+final.serves <- melt(final.serves, id.vars = c('Player', 'Set'))
+
+serves.diff.plot <- ggplot(final.serves, aes(x = Player)) + #facet_grid(Set ~ Player) + 
+    geom_bar(stat = 'identity', aes(y = value, fill = variable)) +
+    # geom_bar(sstat = 'identity', aes(y = value, fill = variable)) +
+    # coord_flip() + 
+    geom_hline(yintercept = 0, colour = "grey90") + 
+    ggtitle('Serve Differences in the Final') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+  xlab('Player') + ylab('Serve Differences') #+ 
+#     scale_x_continuous(breaks = c(1:7))
+print(serves.diff.plot)
+```
+
+The other major difference, in my opinion, between Stan and Rafa was their approach to the game. Nadal is known for his tenacity and perseverence, and his almost inhuman ability to outlast his opponents. What this translates to is a tendency to tempt his opponent into making a mistake (unforced error/UFE). Across all 4 sets in the final, he made fewer of these errors than Wawrinka. Stan, on the other hand, appears to be more pushy - he consistently scored more winning shots (WNR) than Nadal in each set
+```{r, echo=FALSE}
+final.wnr.ufe <- final.data[, c(1, 2, 12, 13)]
+final.wnr.ufe <- melt(final.wnr.ufe, id.vars = c('Player', 'Set'))
+
+final.wnr.ufe$Player <- ifelse(final.wnr.ufe$Player == 'Rafael Nadal', 'Nadal',
+                               ifelse(final.wnr.ufe$Player == 'Stanislas Wawrinka', 'Wawrinka', ''))
+
+wnr.ufe.plot <- ggplot(final.wnr.ufe) + facet_grid(. ~ Set) + 
+    geom_bar(stat = 'identity', aes(x = Player, y = value, fill = variable)) +
+    # geom_bar(sstat = 'identity', aes(y = value, fill = variable)) +
+    # coord_flip() + 
+    ggtitle('Unforced Errors & Winners in the Final') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+  xlab('Player Performance in each Set') + ylab('Unforced Errors & Winners') #+ 
+#     scale_x_continuous(breaks = c(1:7))
+print(wnr.ufe.plot)
+```
+
+The most interesting aspect of this match appears to have been the 3rd set, where Nadal (who almost forfeited after the 2nd because of his back injury) soldiered on to win the set and keep his hopes alive. Despite Wawrinka's 6 aces  and 14 winners in the set, Nadal managed to ensure that he extracted 19 unforced errors from his opponent, and took the set 6-3.
+
+```{r, echo=FALSE}
+final.set3 <- final.data[final.data$Set == 3, ]
+final.set3.2 <- final.set3[, c(1, 3, 12)]
+final.set3.2 <- melt(final.set3.2, id.vars = 'Player')
+
+final.set3.3 <- final.set3[, c(1, 13)]
+final.set3.3 <- melt(final.set3.3, id.vars = 'Player')
+
+set3.plot.1 <- ggplot(final.set3.2)  + 
+    geom_bar(stat = 'identity', aes(x = Player, y = value, fill = variable)) +
+    ggtitle('Set 3 Positives') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+  xlab('Player Performance in Set 3') + ylab('Aces & Winners') #+ 
+print(set3.plot.1)
+
+set3.plot.2 <- ggplot(final.set3.3)  + 
+    geom_bar(stat = 'identity', aes(x = Player, y = value)) +
+    ggtitle('Set 3 Negatives') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+  xlab('Player Performance in Set 3') + ylab('Unforced Errors') #+ 
+print(set3.plot.2)
+```
+All in all, this was Stan's day - he won his first Grand Slam, beating one the all-time greats. A fitting finale to a player who was, for much of his career, in the shadow of another Swiss - Roger Federer.

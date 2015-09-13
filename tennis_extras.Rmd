@@ -1,0 +1,416 @@
+---
+title: "tennis extras"
+author: "Navaneethan Santhanam"
+date: "September 14, 2015"
+output: html_document
+---
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+summary(cars)
+```
+
+You can also embed plots, for example:
+
+```{r, echo=FALSE}
+plot(cars)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r, echo=FALSE}
+sp.diff <- cbind(fsp.diff.count, ssp.diff.count[, 2])
+colnames(sp.diff)[c(2:3)] <- c('First.Serve.Perc.Diff', 'Second.Serve.Perc.Diff')
+
+sp.diff <- melt(sp.diff, id.vars = 'Round')
+
+sp.diff.plt <- ggplot(sp.diff, aes(x = Round, y = value)) +
+    geom_bar(stat = 'identity') + facet_grid(. ~ variable) + 
+    ggtitle('Faceted Serve Perc Differential by Round') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('Average Serve Perc Differential') + 
+    scale_x_continuous(breaks = c(1:7))
+print(sp.diff.plt)
+```
+
+```{r, echo=FALSE}
+sp.diff.plt <- ggplot(sp.diff, aes(x = Round)) +
+    geom_bar(subset = .(variable == 'First.Serve.Perc.Diff'), stat = 'identity', aes(y = -1*abs(value), fill = variable)) +
+    geom_bar(subset = .(variable == 'Second.Serve.Perc.Diff'), stat = 'identity', aes(y = value, fill = variable)) +
+    coord_flip() + 
+    geom_hline(yintercept = 0, colour = "grey90") + 
+    ggtitle('Serve Perc Differential by Round') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('Average Serve Perc Differential') + 
+    scale_x_continuous(breaks = c(1:7))
+print(sp.diff.plt)
+```
+
+```{r, echo=FALSE}
+tennis.data2$ACE.diff <- ifelse(tennis.data2$Result == 0,
+                                tennis.data2$ACE.2 - tennis.data2$ACE.1,
+                                tennis.data2$ACE.1 - tennis.data2$ACE.2)
+
+ace.diff.count <- ddply(tennis.data2, 
+                   .variables = c('Round'), 
+                   .fun = 'summarise',
+                    Mean.Sets = mean(ACE.diff))
+colnames(ace.diff.count)[2] <- 'Mean.Ace.Diff.per.Round'
+
+tennis.data2$DBF.diff <- ifelse(tennis.data2$Result == 0,
+                                tennis.data2$DBF.2 - tennis.data2$DBF.1,
+                                tennis.data2$DBF.1 - tennis.data2$DBF.2)
+
+dbf.diff.count <- ddply(tennis.data2, 
+                   .variables = c('Round'), 
+                   .fun = 'summarise',
+                    Mean.Sets = mean(DBF.diff))
+colnames(dbf.diff.count)[2] <- 'Mean.DoubleFault.Diff.per.Round'
+
+ace.dbf <- cbind(ace.diff.count, dbf.diff.count$Mean.DoubleFault.Diff.per.Round)
+colnames(ace.dbf)[3] <- 'Mean.DoubleFault.Diff.per.Round'
+
+ace.dbf <- melt(ace.dbf, id.vars = 'Round')
+
+ace.dbf.plt <- ggplot(ace.dbf, aes(x = Round)) +
+    geom_bar(subset = .(variable == 'Mean.Ace.Diff.per.Round'), stat = 'identity', aes(y = value, fill = variable)) +
+    geom_bar(subset = .(variable == 'Mean.DoubleFault.Diff.per.Round'), stat = 'identity', aes(y = -1*abs(value), fill = variable)) +
+    coord_flip() + 
+    geom_hline(yintercept = 0, colour = "grey90") + 
+    ggtitle('Aces & Double Fault  Differential by Round') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('Average Ace & Double Fault Perc Differential') + 
+    scale_x_continuous(breaks = c(1:7))
+print(ace.dbf.plt)
+```
+
+First Serve of Winner vs Loser by Round
+```{r}
+tennis.data2$FSW.Winner <- ifelse(tennis.data2$Result == 0, tennis.data2$FSW.2, tennis.data2$FSW.1)
+tennis.data2$FSW.Loser <- ifelse(tennis.data2$Result == 0, tennis.data2$FSW.1, tennis.data2$FSW.2)
+
+fsw.wl.count <- ddply(tennis.data2, 
+                   .variables = c('Round'), 
+                   .fun = 'summarise',
+                   mean(FSW.Winner), 
+                   mean(FSW.Loser))
+colnames(fsw.wl.count)[c(2:3)] <- c('FSW.Winner', 'FSW.Loser')
+# fsw.winner.loser <- tennis.data2[, c('Round', 'FSW.Winner', 'FSW.Loser')]
+fsw.winner.loser <- melt(fsw.wl.count, id.vars = 'Round')
+
+fsw.wl.plt <- ggplot(fsw.winner.loser, aes(x = Round)) +
+    geom_bar(subset = .(variable == 'FSW.Winner'), stat = 'identity', aes(y = value, fill = variable)) +
+    geom_bar(subset = .(variable == 'FSW.Loser'), stat = 'identity', aes(y = -1*abs(value), fill = variable)) +
+    coord_flip() + 
+    geom_hline(yintercept = 0, colour = "grey90") + 
+    ggtitle('First-Serve Winners by Victor/Loser by Round') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('First-Serve Winners') + 
+    scale_x_continuous(breaks = c(1:7))
+print(fsw.wl.plt)
+```
+
+```{r, echo=FALSE}
+fsw.wl.plt2 <- ggplot(fsw.winner.loser, aes(x = Round)) +
+    geom_line(stat = 'identity', aes(y = value, colour = variable), size = 2) +
+    # coord_flip() + 
+    geom_hline(yintercept = 0, colour = "grey90") + 
+    ggtitle('First-Serve Winners by Victor/Loser by Round') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('First-Serve Winners') + 
+    scale_x_continuous(breaks = c(1:7))
+print(fsw.wl.plt2)
+```
+
+```{r}
+tennis.data2$SSW.Winner <- ifelse(tennis.data2$Result == 0, tennis.data2$SSW.2, tennis.data2$SSW.1)
+tennis.data2$SSW.Loser <- ifelse(tennis.data2$Result == 0, tennis.data2$SSW.1, tennis.data2$SSW.2)
+
+ssw.wl.count <- ddply(tennis.data2, 
+                   .variables = c('Round'), 
+                   .fun = 'summarise',
+                   mean(SSW.Winner), 
+                   mean(SSW.Loser))
+colnames(ssw.wl.count)[c(2:3)] <- c('SSW.Winner', 'SSW.Loser')
+ssw.winner.loser <- melt(ssw.wl.count, id.vars = 'Round')
+
+ssw.wl.plt <- ggplot(ssw.winner.loser, aes(x = Round)) +
+    geom_bar(subset = .(variable == 'SSW.Winner'), stat = 'identity', aes(y = value, fill = variable)) +
+    geom_bar(subset = .(variable == 'SSW.Loser'), stat = 'identity', aes(y = -1*abs(value), fill = variable)) +
+    coord_flip() + 
+    geom_hline(yintercept = 0, colour = "grey90") + 
+    ggtitle('Second-Serve Winners by Victor/Loser by Round') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('Second-Serve Winners') + 
+    scale_x_continuous(breaks = c(1:7))
+print(ssw.wl.plt)
+```
+
+```{r, echo=FALSE}
+ssw.wl.plt2 <- ggplot(ssw.winner.loser, aes(x = Round)) +
+    geom_line(stat = 'identity', aes(y = value, colour = variable), size = 2) +
+    # coord_flip() + 
+    geom_hline(yintercept = 0, colour = "grey90") + 
+    ggtitle('Second-Serve Winners by Victor/Loser by Round') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('Second-Serve Winners') + 
+    scale_x_continuous(breaks = c(1:7))
+print(ssw.wl.plt2)
+```
+
+
+Aces Winner vs Loser by Round
+```{r}
+tennis.data2$ACE.Winner <- ifelse(tennis.data2$Result == 0, tennis.data2$ACE.2, tennis.data2$ACE.1)
+tennis.data2$ACE.Loser <- ifelse(tennis.data2$Result == 0, tennis.data2$ACE.1, tennis.data2$ACE.2)
+
+ace.wl.count <- ddply(tennis.data2, 
+                   .variables = c('Round'), 
+                   .fun = 'summarise',
+                   mean(ACE.Winner), 
+                   mean(ACE.Loser))
+colnames(ace.wl.count)[c(2:3)] <- c('ACE.Winner', 'ACE.Loser')
+ace.winner.loser <- melt(ace.wl.count, id.vars = 'Round')
+
+ace.wl.plt <- ggplot(ace.winner.loser, aes(x = Round)) +
+    geom_bar(subset = .(variable == 'ACE.Winner'), stat = 'identity', aes(y = value, fill = variable)) +
+    geom_bar(subset = .(variable == 'ACE.Loser'), stat = 'identity', aes(y = -1*abs(value), fill = variable)) +
+    # coord_flip() + 
+    geom_hline(yintercept = 0, colour = "grey90") + 
+    ggtitle('Aces by Victor/Loser by Round') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('Average Number of Aces') + 
+    scale_x_continuous(breaks = c(1:7))
+print(ace.wl.plt)
+```
+
+```{r}
+tennis.data2$DBF.Winner <- ifelse(tennis.data2$Result == 0, tennis.data2$DBF.2, tennis.data2$DBF.1)
+tennis.data2$DBF.Loser <- ifelse(tennis.data2$Result == 0, tennis.data2$DBF.1, tennis.data2$DBF.2)
+
+dbf.wl.count <- ddply(tennis.data2, 
+                   .variables = c('Round'), 
+                   .fun = 'summarise',
+                   mean(DBF.Winner), 
+                   mean(DBF.Loser))
+colnames(dbf.wl.count)[c(2:3)] <- c('DBF.Winner', 'DBF.Loser')
+dbf.winner.loser <- melt(dbf.wl.count, id.vars = 'Round')
+
+dbf.wl.plt <- ggplot(dbf.winner.loser, aes(x = Round)) +
+    geom_bar(subset = .(variable == 'DBF.Winner'), stat = 'identity', aes(y = value, fill = variable)) +
+    geom_bar(subset = .(variable == 'DBF.Loser'), stat = 'identity', aes(y = -1*abs(value), fill = variable)) +
+    # coord_flip() + 
+    geom_hline(yintercept = 0, colour = "grey90") + 
+    ggtitle('Double Faults by Victor/Loser by Round') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('Average Number of Double Faults') + 
+    scale_x_continuous(breaks = c(1:7))
+print(dbf.wl.plt)
+```
+
+Winning Shots by Victor vs Loser by Round
+```{r}
+tennis.data2$WNR.Winner <- ifelse(tennis.data2$Result == 0, tennis.data2$WNR.2, tennis.data2$WNR.1)
+tennis.data2$WNR.Loser <- ifelse(tennis.data2$Result == 0, tennis.data2$WNR.1, tennis.data2$WNR.2)
+
+wnr.wl.count <- ddply(tennis.data2, 
+                   .variables = c('Round'), 
+                   .fun = 'summarise',
+                   mean(WNR.Winner), 
+                   mean(WNR.Loser))
+colnames(wnr.wl.count)[c(2:3)] <- c('WNR.Winner', 'WNR.Loser')
+wnr.winner.loser <- melt(wnr.wl.count, id.vars = 'Round')
+
+wnr.wl.plt <- ggplot(wnr.winner.loser, aes(x = Round)) +
+    geom_bar(subset = .(variable == 'WNR.Winner'), stat = 'identity', aes(y = value, fill = variable)) +
+    geom_bar(subset = .(variable == 'WNR.Loser'), stat = 'identity', aes(y = -1*abs(value), fill = variable)) +
+    # coord_flip() + 
+    geom_hline(yintercept = 0, colour = "grey90") + 
+    ggtitle('Winning Shots by Victor/Loser by Round') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('Average Number of Winning Shots (\'Winners\')') + 
+    scale_x_continuous(breaks = c(1:7))
+print(wnr.wl.plt)
+```
+
+```{r, echo=FALSE}
+tennis.data2$UFE.Winner <- ifelse(tennis.data2$Result == 0, tennis.data2$UFE.2, tennis.data2$UFE.1)
+tennis.data2$UFE.Loser <- ifelse(tennis.data2$Result == 0, tennis.data2$UFE.1, tennis.data2$UFE.2)
+
+ufe.wl.count <- ddply(tennis.data2, 
+                   .variables = c('Round'), 
+                   .fun = 'summarise',
+                   mean(UFE.Winner), 
+                   mean(UFE.Loser))
+
+colnames(ufe.wl.count)[c(2:3)] <- c('UFE.Winner', 'UFE.Loser')
+ufe.winner.loser <- melt(ufe.wl.count, id.vars = 'Round')
+
+ufe.wl.plt <- ggplot(ufe.winner.loser, aes(x = Round)) +
+    geom_bar(subset = .(variable == 'UFE.Winner'), stat = 'identity', aes(y = value, fill = variable)) +
+    geom_bar(subset = .(variable == 'UFE.Loser'), stat = 'identity', aes(y = -1*abs(value), fill = variable)) +
+    # coord_flip() + 
+    geom_hline(yintercept = 0, colour = "grey90") + 
+    ggtitle('Unforced Errors by Victor/Loser per Round') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('Average Number of Unforced Erors') + 
+    scale_x_continuous(breaks = c(1:7))
+print(ufe.wl.plt)
+```
+
+```{r, echo=FALSE}
+tennis.data2$NPW.Winner <- ifelse(tennis.data2$Result == 0, tennis.data2$NPW.2, tennis.data2$NPW.1)
+tennis.data2$NPW.Loser <- ifelse(tennis.data2$Result == 0, tennis.data2$NPW.1, tennis.data2$NPW.2)
+
+npw.wl.count <- ddply(tennis.data2, 
+                   .variables = c('Round'), 
+                   .fun = 'summarise',
+                   mean(NPW.Winner), 
+                   mean(NPW.Loser))
+
+colnames(npw.wl.count)[c(2:3)] <- c('NPW.Winner', 'NPW.Loser')
+npw.winner.loser <- melt(npw.wl.count, id.vars = 'Round')
+
+npw.wl.plt <- ggplot(npw.winner.loser, aes(x = Round)) +
+    geom_bar(subset = .(variable == 'NPW.Winner'), stat = 'identity', aes(y = value, fill = variable)) +
+    geom_bar(subset = .(variable == 'NPW.Loser'), stat = 'identity', aes(y = -1*abs(value), fill = variable)) +
+    coord_flip() + 
+    geom_hline(yintercept = 0, colour = "grey90") + 
+    ggtitle('Net Points Won by Victor/Loser per Round') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('Average Number of Net Points Won') + 
+    scale_x_continuous(breaks = c(1:7))
+print(npw.wl.plt)
+```
+
+```{r, echo=FALSE}
+tennis.data2$BPW.Winner <- ifelse(tennis.data2$Result == 0, tennis.data2$BPW.2, tennis.data2$BPW.1)
+tennis.data2$BPW.Loser <- ifelse(tennis.data2$Result == 0, tennis.data2$BPW.1, tennis.data2$BPW.2)
+
+bpw.wl.count <- ddply(tennis.data2, 
+                   .variables = c('Round'), 
+                   .fun = 'summarise',
+                   mean(BPW.Winner), 
+                   mean(BPW.Loser))
+
+colnames(bpw.wl.count)[c(2:3)] <- c('BPW.Winner', 'BPW.Loser')
+bpw.winner.loser <- melt(bpw.wl.count, id.vars = 'Round')
+
+bpw.wl.plt <- ggplot(bpw.winner.loser, aes(x = Round)) +
+    geom_bar(subset = .(variable == 'BPW.Winner'), stat = 'identity', aes(y = value, fill = variable)) +
+    geom_bar(subset = .(variable == 'BPW.Loser'), stat = 'identity', aes(y = -1*abs(value), fill = variable)) +
+    coord_flip() + 
+    geom_hline(yintercept = 0, colour = "grey90") + 
+    ggtitle('Break Points Won by Victor/Loser per Round') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('Average Number of Break Points Won') + 
+    scale_x_continuous(breaks = c(1:7))
+print(bpw.wl.plt)
+```
+
+Stan vs Rafa
+```{r, echo=FALSE}
+stan.data <- tennis.data2[tennis.data2$Player1 == 'Stanislas Wawrinka' | 
+                            tennis.data2$Player2 == 'Stanislas Wawrinka', c(4:ncol(tennis.data2))]
+rafa.data <- tennis.data2[tennis.data2$Player1 == 'Rafael Nadal' | 
+                            tennis.data2$Player2 == 'Rafael Nadal', c(4:ncol(tennis.data2))]
+stan.data$Player.Name <- rep('Stanislas Wawrinka', nrow(stan.data))
+rafa.data$Player.Name <- rep('Rafael Nadal', nrow(rafa.data))
+
+colnames(rafa.data)[c(17:21)] <- c('Set1', 'Set2', 'Set3', 'Set4', 'Set5')
+colnames(stan.data)[c(35:39)] <- c('Set1', 'Set2', 'Set3', 'Set4', 'Set5')
+
+
+
+sr.sets <- rbind(stan.data[6, c(35:39, 53)], rafa.data[7, c(17:21, 53)])
+sr.sets <- melt(sr.sets, id.vars = 'Player.Name')
+sr.sets <- sr.sets[sr.sets$value != 0, ]
+
+sr.sets.plt <- ggplot(sr.sets, aes(x = variable)) +
+    geom_bar(subset = .(Player.Name == 'Stanislas Wawrinka'), stat = 'identity', aes(y = value, fill = Player.Name)) +
+    geom_bar(subset = .(Player.Name == 'Rafael Nadal'), stat = 'identity', aes(y = -1*abs(value), fill = Player.Name)) +
+    coord_flip() + 
+    geom_hline(yintercept = 0, colour = "grey90") + 
+    ggtitle('Breakdown of Sets in Final') + 
+    theme(axis.text.x = element_text(size = 12, face = 'bold', vjust = 1)) +  
+    theme(axis.text.y = element_text(size = 12, face = 'bold', vjust = 0)) + 
+    theme(axis.title = element_text(size = 12, face = 'bold', vjust = 0.5)) + 
+    theme(title = element_text(size = 14, face = 'bold')) + 
+    xlab('Round') + ylab('How each set went') 
+print(sr.sets.plt)
+```
+
+Random Forest model for predicting winners
+```{r, echo=FALSE}
+tennis.data2 <- tennis.data2[, -c(44:49)]
+
+train.data <- tennis.data2[sample(nrow(tennis.data2), size = ceiling(0.7*nrow(tennis.data2))), ]
+test.data <- tennis.data2[!rownames(tennis.data2) %in% rownames(train.data), ]
+
+tennis.data3 <- tennis.data2[, !c(1:71) %in% c(1:3, 43:49, 56:71)]
+tennis.data3$Result <- as.factor(tennis.data3$Result)
+
+tennis.rf <- randomForest(Result ~ ., data = tennis.data3, 
+                          mtry = ceiling(sqrt(ncol(tennis.data3)-1))+1, 
+                          importance = TRUE, do.trace = 100)
+
+tennis.data4 <- tennis.data2[, c(4, 7:42)]
+tennis.data4$Result <- as.factor(tennis.data4$Result)
+tennis.rf2 <- randomForest(Result ~ ., data = tennis.data4, 
+                          mtry = ceiling(sqrt(ncol(tennis.data4)-1))+1, 
+                          importance = TRUE, do.trace = 100)
+
+tennis.data5 <- tennis.data2[, c(4, 56:71)]
+tennis.data5$Result <- as.factor(tennis.data5$Result)
+tennis.rf3 <- randomForest(Result ~ ., data = tennis.data5, 
+                          mtry = ceiling(sqrt(ncol(tennis.data5)-1))+1, 
+                          importance = TRUE, do.trace = 100)
+
+tennis.data6 <- tennis.data2[, c(4, 7:19, 25:37)]
+tennis.data6$Result <- as.factor(tennis.data6$Result)
+tennis.rf4 <- randomForest(Result ~ ., data = tennis.data6, 
+                          mtry = ceiling(sqrt(ncol(tennis.data6)-1))+1, 
+                          importance = TRUE, do.trace = 100)
+```
